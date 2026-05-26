@@ -13,11 +13,44 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+const siteDescription =
+  "Swap USDC, EURC, and cirBTC on Arc Testnet. Arcane is a dark, minimal stablecoin DEX powered by Circle App Kit.";
+
 export const metadata: Metadata = {
-  title: "Arcane",
-  description: "Swap stablecoins on Arc Testnet — USDC, EURC, and cirBTC",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Arcane",
+    template: "%s | Arcane",
+  },
+  description: siteDescription,
+  applicationName: "Arcane",
   icons: {
     icon: "/logo.png",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    siteName: "Arcane",
+    title: "Arcane",
+    description: siteDescription,
+    images: [
+      {
+        url: "/logo.png",
+        alt: "Arcane logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Arcane",
+    description: siteDescription,
+    images: ["/logo.png"],
+    creator: "@SawadaTataro88",
   },
 };
 
