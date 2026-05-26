@@ -14,9 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Arc Swap | DEX",
-  description:
-    "Swap USDC, EURC, and cirBTC on Arc Testnet using Circle App Kit",
+  title: "Arcane",
+  description: "Swap stablecoins on Arc Testnet — USDC, EURC, and cirBTC",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -27,9 +29,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      style={{ colorScheme: "dark" }}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col bg-[#030308] text-[#e8e4f5]">
         <Web3Provider>{children}</Web3Provider>
       </body>
     </html>

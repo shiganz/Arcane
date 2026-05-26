@@ -9,24 +9,27 @@ type SwapResultProps = {
 
 export function SwapResultPanel({ result, onDismiss }: SwapResultProps) {
   return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+    <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/40 px-4 py-4">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-medium text-emerald-900 dark:text-emerald-100">
-            Swap successful
-          </p>
-          <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
-            {result.amountOut
-              ? `Received ${result.amountOut} ${result.tokenOut}`
-              : `Swapped for ${result.tokenOut}`}
-          </p>
+        <div className="flex gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-900/50 text-emerald-400">
+            ✓
+          </span>
+          <div>
+            <p className="font-medium text-emerald-400">Swap complete</p>
+            <p className="mt-0.5 text-sm text-emerald-500/80">
+              {result.amountOut
+                ? `Received ${result.amountOut} ${result.tokenOut}`
+                : `Swapped for ${result.tokenOut}`}
+            </p>
+          </div>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="text-sm text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-100"
+          className="shrink-0 text-sm text-emerald-600 transition-colors hover:text-emerald-400"
         >
-          Dismiss
+          Close
         </button>
       </div>
       {result.explorerUrl && (
@@ -34,9 +37,10 @@ export function SwapResultPanel({ result, onDismiss }: SwapResultProps) {
           href={result.explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 inline-block text-sm font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-100"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-500 transition-colors hover:text-emerald-400"
         >
-          View on Arcscan
+          View transaction
+          <span aria-hidden>→</span>
         </a>
       )}
     </div>

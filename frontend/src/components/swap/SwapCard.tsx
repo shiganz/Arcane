@@ -1,38 +1,96 @@
 "use client";
 
-import { ConnectButton, useConnectModal } from "@rainbow-me/rainbowkit";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useMemo } from "react";
+import { parseUnits } from "viem";
 import { FeeBreakdown } from "@/components/swap/FeeBreakdown";
 import { SwapResultPanel } from "@/components/swap/SwapResult";
-import { TokenSelect } from "@/components/swap/TokenSelect";
+import { SwapStatusBanner } from "@/components/swap/SwapStatusBanner";
+import { SwapTokenField } from "@/components/swap/SwapTokenField";
+import { ArcaneLogo } from "@/components/ArcaneLogo";
+import { WalletBar } from "@/components/swap/WalletBar";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useSwap } from "@/hooks/useSwap";
-import { isWalletConnectConfigured } from "@/lib/wagmi";
+import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { SLIPPAGE_PRESETS } from "@/lib/swap-config";
+import { TOKEN_META } from "@/lib/tokens";
+
+function FlipIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className="h-4 w-4"
+    >
+      <path
+        fillRule="evenodd"
+        d="M14.478 3.404a.75.75 0 0 1 0 1.06L12.94 6l1.54 1.54a.75.75 0 1 1-1.06 1.06L11 7.53l-1.54 1.54a.75.75 0 1 1-1.06-1.06L10.47 6 8.93 4.46a.75.75 0 0 1 1.06-1.06L11 5.47l1.54-1.54a.75.75 0 0 1 1.06 0ZM5.52 13.47l1.54 1.54a.75.75 0 1 1-1.06 1.06L5.47 14.53l-1.54 1.54a.75.75 0 0 1-1.06-1.06L5.47 13.47 3.93 11.93a.75.75 0 0 1 1.06-1.06l1.54 1.54 1.54-1.54a.75.75 0 1 1 1.06 1.06L5.52 13.47Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
 
 export function SwapCard() {
   const swap = useSwap();
+  const { balances, isLoading: isLoadingBalances, refetch } = useTokenBalances();
   const { openConnectModal } = useConnectModal();
 
+  const payBalance = balances[swap.tokenIn];
+  const receiveBalance = balances[swap.tokenOut];
+  const usdcBalance = balances.USDC;
+
+  const insufficientBalance = useMemo(() => {
+    if (!swap.amountIn || payBalance === undefined) return false;
+    try {
+      const decimals = TOKEN_META[swap.tokenIn].decimals;
+      const needed = parseUnits(swap.amountIn, decimals);
+      return needed > payBalance;
+    } catch {
+      return false;
+    }
+  }, [swap.amountIn, swap.tokenIn, payBalance]);
+
+  const rateLabel = useMemo(() => {
+    if (swap.isEstimating || !swap.estimate || !swap.amountIn) return null;
+    const inAmt = Number.parseFloat(swap.amountIn);
+    const outAmt = Number.parseFloat(swap.estimate.estimatedOutput.amount);
+    if (!inAmt || !outAmt) return null;
+    const rate = outAmt / inAmt;
+    return `1 ${swap.tokenIn} ≈ ${rate.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${swap.tokenOut}`;
+  }, [swap.estimate, swap.amountIn, swap.tokenIn, swap.tokenOut, swap.isEstimating]);
+
   const ctaLabel = (() => {
-    if (!swap.kitKeyConfigured) return "Configure kit key";
     if (!swap.isConnected) return "Connect wallet";
     if (swap.wrongNetwork) return "Switch to Arc Testnet";
-    if (!swap.amountIn) return "Enter amount";
-    if (swap.tokenIn === swap.tokenOut) return "Select different tokens";
     if (swap.isSwapping) return "Swapping…";
     if (swap.isSwitchingChain) return "Switching network…";
+    if (swap.isEstimating) return "Getting quote…";
+    if (!swap.amountIn) return "Enter an amount";
+    if (swap.tokenIn === swap.tokenOut) return "Choose different tokens";
+    if (insufficientBalance) return "Insufficient balance";
     return "Swap";
   })();
 
+  const hasValidSwapInput =
+    swap.isConnected &&
+    !swap.wrongNetwork &&
+    Boolean(swap.amountIn) &&
+    swap.tokenIn !== swap.tokenOut &&
+    !insufficientBalance &&
+    !swap.isEstimating;
+
   const isCtaDisabled =
-    !swap.kitKeyConfigured ||
     swap.isSwapping ||
     swap.isSwitchingChain ||
+    swap.isEstimating ||
+    insufficientBalance ||
     (swap.isConnected &&
       !swap.wrongNetwork &&
       (!swap.amountIn || swap.tokenIn === swap.tokenOut));
 
   const handlePrimaryAction = () => {
-    if (!swap.kitKeyConfigured) return;
     if (!swap.isConnected) {
       openConnectModal?.();
       return;
@@ -45,176 +103,92 @@ export function SwapCard() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Arc Swap
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Swap stablecoins on Arc Testnet
-          </p>
+    <div className="w-full max-w-[480px]">
+      <header className="mb-6 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <ArcaneLogo size={40} subtitle="Swap" />
+          <WalletBar
+            address={swap.address}
+            usdcBalance={usdcBalance}
+            isLoadingUsdc={isLoadingBalances}
+          />
         </div>
-        <ConnectButton showBalance={false} chainStatus="icon" />
-      </div>
+      </header>
 
-      {!isWalletConnectConfigured() && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-          <p>
-            Add a project ID to <code className="font-mono">.env.local</code> as{" "}
-            <code className="font-mono">NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</code>{" "}
-            from{" "}
-            <a
-              href="https://cloud.reown.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-            >
-              Reown Cloud
-            </a>
-            .
-          </p>
-        </div>
-      )}
-
-      {process.env.NODE_ENV === "development" && isWalletConnectConfigured() && (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300">
-          <p className="font-medium text-zinc-800 dark:text-zinc-200">
-            Seeing &quot;Origin not found on Allowlist&quot;?
-          </p>
-          <p className="mt-1">
-            In{" "}
-            <a
-              href="https://cloud.reown.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-            >
-              cloud.reown.com
-            </a>
-            , open your project → <strong>Domains</strong> and add:
-          </p>
-          <ul className="mt-2 list-inside list-disc font-mono text-xs">
-            <li>http://localhost:3000</li>
-            <li>http://127.0.0.1:3000</li>
-          </ul>
-          <p className="mt-2">Save, then restart <code className="font-mono">npm run dev</code>.</p>
-        </div>
-      )}
-
-      {!swap.kitKeyConfigured && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-          Add your Circle kit key to <code className="font-mono">.env.local</code>{" "}
-          as <code className="font-mono">KIT_KEY</code> (or{" "}
-          <code className="font-mono">NEXT_PUBLIC_KIT_KEY</code>). Copy from{" "}
-          <code className="font-mono">.env.example</code>.
-        </div>
-      )}
-
-      {!swap.isConnected && swap.kitKeyConfigured && (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300">
-          <p>Before swapping:</p>
-          <ul className="mt-2 list-inside list-disc space-y-1">
-            <li>Connect your wallet with RainbowKit (top right)</li>
-            <li>
-              <a
-                href="https://docs.arc.io/arc/references/connect-to-arc#wallet-setup"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                Add Arc Testnet to your wallet if needed
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://faucet.circle.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                Fund your wallet from the Circle faucet
-              </a>
-            </li>
-          </ul>
-        </div>
-      )}
-
-      {swap.wrongNetwork && swap.isConnected && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
-          Your wallet is not on Arc Testnet. Use the button below to switch
-          networks.
-        </div>
-      )}
-
-      <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <TokenSelect
-          label="You pay"
-          value={swap.tokenIn}
-          onChange={swap.setTokenIn}
-          disabled={!swap.isConnected}
-        />
-
-        <div className="flex justify-center">
+      <div className="swap-card rounded-2xl p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Swap</h2>
           <button
             type="button"
-            onClick={swap.flipTokens}
-            disabled={!swap.isConnected}
-            aria-label="Flip tokens"
-            className="rounded-full border border-zinc-200 p-2 text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            onClick={() => void refetch()}
+            disabled={swap.isSwapping}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#8b95a8] transition-colors hover:bg-[#1e2836] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Refresh balances"
+            title="Refresh balances"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="h-5 w-5"
-            >
-              <path
-                fillRule="evenodd"
-                d="M14.478 3.404a.75.75 0 0 1 0 1.06L12.94 6l1.54 1.54a.75.75 0 1 1-1.06 1.06L11 7.53l-1.54 1.54a.75.75 0 1 1-1.06-1.06L10.47 6 8.93 4.46a.75.75 0 0 1 1.06-1.06L11 5.47l1.54-1.54a.75.75 0 0 1 1.06 0ZM5.52 13.47l1.54 1.54a.75.75 0 1 1-1.06 1.06L5.47 14.53l-1.54 1.54a.75.75 0 0 1-1.06-1.06L5.47 13.47 3.93 11.93a.75.75 0 0 1 1.06-1.06l1.54 1.54 1.54-1.54a.75.75 0 1 1 1.06 1.06L5.52 13.47Z"
-                clipRule="evenodd"
-              />
-            </svg>
+            ↻
           </button>
         </div>
 
-        <TokenSelect
-          label="You receive"
-          value={swap.tokenOut}
-          onChange={swap.setTokenOut}
-          disabled={!swap.isConnected}
+        <SwapTokenField
+          label="You pay"
+          token={swap.tokenIn}
+          onTokenChange={swap.setTokenIn}
+          amount={swap.amountIn}
+          onAmountChange={swap.setAmountIn}
+          balance={payBalance}
+          isLoadingBalance={isLoadingBalances}
+          disabled={!swap.isConnected || swap.isSwapping}
+          excludeToken={swap.tokenOut}
+          balances={balances}
+          isLoadingBalances={isLoadingBalances}
+          showPercentShortcuts
         />
 
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Amount
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={swap.amountIn}
-            disabled={!swap.isConnected}
-            onChange={(event) => swap.setAmountIn(event.target.value)}
-            className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-zinc-900 outline-none transition-colors focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:border-zinc-600"
-          />
-        </label>
+        <div className="relative z-10 -my-2 flex justify-center">
+          <button
+            type="button"
+            onClick={swap.flipTokens}
+            disabled={!swap.isConnected || swap.isSwapping}
+            aria-label="Flip tokens"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-[#2a3548] bg-[#121b24] text-[#8b95a8] shadow-lg transition-all hover:border-orange-500/40 hover:text-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <FlipIcon />
+          </button>
+        </div>
 
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-            Slippage tolerance
-          </span>
+        <SwapTokenField
+          label="To get"
+          token={swap.tokenOut}
+          onTokenChange={swap.setTokenOut}
+          readOnlyAmount
+          isLoadingQuote={swap.isEstimating}
+          displayAmount={
+            swap.estimate
+              ? swap.estimate.estimatedOutput.amount
+              : "0.00"
+          }
+          balance={receiveBalance}
+          isLoadingBalance={isLoadingBalances}
+          disabled={!swap.isConnected || swap.isSwapping}
+          excludeToken={swap.tokenIn}
+          balances={balances}
+          isLoadingBalances={isLoadingBalances}
+        />
+
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium text-[#8b95a8]">Slippage</p>
           <div className="flex gap-2">
             {SLIPPAGE_PRESETS.map((preset) => (
               <button
                 key={preset.bps}
                 type="button"
-                disabled={!swap.isConnected}
+                disabled={!swap.isConnected || swap.isSwapping}
                 onClick={() => swap.setSlippageBps(preset.bps)}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex-1 cursor-pointer rounded-lg py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
                   swap.slippageBps === preset.bps
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                    ? "bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/40"
+                    : "bg-[#0d1219] text-[#8b95a8] hover:bg-[#1e2836] hover:text-white"
                 }`}
               >
                 {preset.label}
@@ -223,31 +197,61 @@ export function SwapCard() {
           </div>
         </div>
 
-        <FeeBreakdown
-          estimate={swap.estimate}
-          isEstimating={swap.isEstimating}
-          tokenOut={swap.tokenOut}
-        />
+        <div className="mt-4">
+          <FeeBreakdown
+            estimate={swap.estimate}
+            isEstimating={swap.isEstimating}
+            tokenOut={swap.tokenOut}
+          />
+        </div>
+
+        {swap.isEstimating && (
+          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-[#8b95a8]">
+            <LoadingSpinner size="sm" />
+            Updating quote…
+          </p>
+        )}
+
+        {rateLabel && !swap.isEstimating && (
+          <p className="mt-3 text-center text-xs text-[#5c6478]">{rateLabel}</p>
+        )}
+
+        {swap.isSwapping && (
+          <SwapStatusBanner message="Confirm the swap in your wallet…" />
+        )}
+
+        {swap.wrongNetwork && swap.isConnected && (
+          <p className="mt-4 rounded-xl border border-amber-900/40 bg-amber-950/30 px-3 py-2.5 text-sm text-amber-400/90">
+            Switch to Arc Testnet to continue.
+          </p>
+        )}
 
         {swap.error && (
-          <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+          <p className="mt-4 rounded-xl border border-red-900/40 bg-red-950/30 px-3 py-2.5 text-sm text-red-400/90">
             {swap.error}
           </p>
         )}
 
         {swap.result && (
-          <SwapResultPanel
-            result={swap.result}
-            onDismiss={swap.clearResult}
-          />
+          <div className="mt-4">
+            <SwapResultPanel result={swap.result} onDismiss={swap.clearResult} />
+          </div>
         )}
 
         <button
           type="button"
           onClick={handlePrimaryAction}
           disabled={isCtaDisabled}
-          className="w-full rounded-xl bg-zinc-900 px-4 py-3.5 text-base font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          aria-busy={swap.isEstimating || swap.isSwapping}
+          className={`mt-5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl py-4 text-base font-semibold transition-all disabled:cursor-not-allowed ${
+            hasValidSwapInput && !swap.isSwapping
+              ? "swap-cta-primary"
+              : "swap-cta"
+          }`}
         >
+          {swap.isSwapping && (
+            <LoadingSpinner size="sm" className="border-[#3d4d66] border-t-white" />
+          )}
           {ctaLabel}
         </button>
       </div>

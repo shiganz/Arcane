@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SwapEstimate, SwapResult } from "@circle-fin/app-kit";
 import type { ViemAdapter } from "@circle-fin/adapter-viem-v2";
 import {
@@ -10,6 +10,9 @@ import {
 } from "wagmi";
 import { kit } from "@/lib/app-kit";
 import { arcTestnet } from "@/lib/chains";
+import type { UseSwapReturn } from "@/hooks/useSwap.types";
+
+export type { UseSwapReturn } from "@/hooks/useSwap.types";
 import {
   DEFAULT_SLIPPAGE_BPS,
   isKitKeyConfigured,
@@ -26,7 +29,26 @@ function getErrorMessage(error: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
-export function useSwap() {
+function shouldFetchEstimate(
+  adapter: ViemAdapter | null,
+  address: string | undefined,
+  amountIn: string,
+  tokenIn: SwapToken,
+  tokenOut: SwapToken,
+  wrongNetwork: boolean,
+): boolean {
+  if (!adapter || !address || !isKitKeyConfigured() || wrongNetwork) {
+    return false;
+  }
+  const parsedAmount = Number.parseFloat(amountIn);
+  if (!amountIn || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+    return false;
+  }
+  if (tokenIn === tokenOut) return false;
+  return true;
+}
+
+export function useSwap(): UseSwapReturn {
   const { address, isConnected, connector } = useAccount();
   const chainId = useChainId();
   const { switchChainAsync, isPending: isSwitchingChain } = useSwitchChain();
@@ -44,6 +66,8 @@ export function useSwap() {
   const estimateRequestId = useRef(0);
 
   const wrongNetwork = isConnected && chainId !== arcTestnet.id;
+
+  const isBusy = isEstimating || isSwapping || isSwitchingChain;
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +114,7 @@ export function useSwap() {
     setEstimate(null);
     setResult(null);
     setError(null);
+    setIsEstimating(false);
   }, [tokenIn, tokenOut]);
 
   const updateAmountIn = useCallback((value: string) => {
@@ -97,41 +122,49 @@ export function useSwap() {
     const parsedAmount = Number.parseFloat(value);
     if (!value || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
       setEstimate(null);
+      setIsEstimating(false);
     }
   }, []);
 
   const updateTokenIn = useCallback((token: SwapToken) => {
     setTokenIn(token);
-    if (token === tokenOut) setEstimate(null);
+    if (token === tokenOut) {
+      setEstimate(null);
+      setIsEstimating(false);
+    }
   }, [tokenOut]);
 
   const updateTokenOut = useCallback((token: SwapToken) => {
     setTokenOut(token);
-    if (token === tokenIn) setEstimate(null);
+    if (token === tokenIn) {
+      setEstimate(null);
+      setIsEstimating(false);
+    }
   }, [tokenIn]);
 
   useEffect(() => {
-    if (!adapter || !address || !isKitKeyConfigured() || wrongNetwork) {
+    const canEstimate = shouldFetchEstimate(
+      adapter,
+      address,
+      amountIn,
+      tokenIn,
+      tokenOut,
+      wrongNetwork,
+    );
+
+    if (!canEstimate) {
+      setIsEstimating(false);
       return;
     }
 
-    const parsedAmount = Number.parseFloat(amountIn);
-    if (!amountIn || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      return;
-    }
-
-    if (tokenIn === tokenOut) {
-      return;
-    }
+    setIsEstimating(true);
+    setError(null);
 
     const requestId = ++estimateRequestId.current;
     const timer = window.setTimeout(async () => {
-      setIsEstimating(true);
-      setError(null);
-
       try {
         const nextEstimate = await kit.estimateSwap({
-          from: { adapter, chain: SWAP_CHAIN },
+          from: { adapter: adapter!, chain: SWAP_CHAIN },
           tokenIn,
           tokenOut,
           amountIn,
@@ -154,7 +187,10 @@ export function useSwap() {
       }
     }, 400);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      estimateRequestId.current += 1;
+    };
   }, [adapter, address, amountIn, slippageBps, tokenIn, tokenOut, wrongNetwork]);
 
   const swap = useCallback(async () => {
@@ -170,6 +206,11 @@ export function useSwap() {
 
     if (wrongNetwork) {
       setError("Switch to Arc Testnet to continue.");
+      return;
+    }
+
+    if (isEstimating) {
+      setError("Wait for the quote to finish.");
       return;
     }
 
@@ -189,7 +230,7 @@ export function useSwap() {
     setResult(null);
 
     try {
-      const swapResult = await kit.swap({
+      const swapResult: SwapResult = await kit.swap({
         from: { adapter, chain: SWAP_CHAIN },
         tokenIn,
         tokenOut,
@@ -211,6 +252,7 @@ export function useSwap() {
     adapter,
     address,
     amountIn,
+    isEstimating,
     slippageBps,
     tokenIn,
     tokenOut,
@@ -221,29 +263,56 @@ export function useSwap() {
     setResult(null);
   }, []);
 
-  return {
-    address: address ?? null,
-    adapter,
-    wrongNetwork,
-    tokenIn,
-    tokenOut,
-    amountIn,
-    slippageBps,
-    estimate,
-    result,
-    isSwitchingChain,
-    isEstimating,
-    isSwapping,
-    error,
-    isConnected,
-    kitKeyConfigured: isKitKeyConfigured(),
-    setTokenIn: updateTokenIn,
-    setTokenOut: updateTokenOut,
-    setAmountIn: updateAmountIn,
-    setSlippageBps,
-    switchNetwork,
-    flipTokens,
-    swap,
-    clearResult,
-  };
+  return useMemo(
+    (): UseSwapReturn => ({
+      address: (address as `0x${string}` | undefined) ?? null,
+      adapter,
+      wrongNetwork,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      slippageBps,
+      estimate,
+      result,
+      isSwitchingChain,
+      isEstimating,
+      isSwapping,
+      isBusy,
+      error,
+      isConnected,
+      kitKeyConfigured: isKitKeyConfigured(),
+      setTokenIn: updateTokenIn,
+      setTokenOut: updateTokenOut,
+      setAmountIn: updateAmountIn,
+      setSlippageBps,
+      switchNetwork,
+      flipTokens,
+      swap,
+      clearResult,
+    }),
+    [
+      address,
+      adapter,
+      wrongNetwork,
+      tokenIn,
+      tokenOut,
+      amountIn,
+      slippageBps,
+      estimate,
+      result,
+      isSwitchingChain,
+      isEstimating,
+      isSwapping,
+      isBusy,
+      error,
+      isConnected,
+      updateTokenIn,
+      updateTokenOut,
+      updateAmountIn,
+      switchNetwork,
+      flipTokens,
+      swap,
+      clearResult,
+    ],
+  );
 }

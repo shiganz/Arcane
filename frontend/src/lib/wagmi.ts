@@ -5,7 +5,7 @@ const walletConnectProjectId =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "";
 
 export const wagmiConfig = getDefaultConfig({
-  appName: "Arc Swap",
+  appName: "Arcane",
   projectId: walletConnectProjectId || "00000000000000000000000000000000",
   chains: [arcTestnet],
   ssr: true,

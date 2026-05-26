@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark only;
+  --background: #0a0e14;
+  --foreground: #f0f2f5;
+  --surface: #141c28;
+  --surface-raised: #1a2433;
+  --border: #2a3548;
+  --muted: #8b95a8;
+  --accent: #f97316;
+  --accent-dim: rgba(249, 115, 22, 0.15);
 }
 
 @theme inline {
@@ -12,15 +19,138 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark only;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+input,
+select,
+textarea,
+button {
+  color-scheme: dark;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+.token-select-trigger {
+  cursor: pointer;
+}
+
+.token-list-item {
+  cursor: pointer;
+}
+
+.arcane-bg {
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(59, 130, 246, 0.12), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 80% 100%, rgba(249, 115, 22, 0.08), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 10% 90%, rgba(30, 58, 95, 0.2), transparent 45%),
+    linear-gradient(180deg, #0c1219 0%, #0a0e14 40%, #12100e 100%);
+}
+
+.swap-card {
+  background: rgba(20, 28, 40, 0.85);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 24px 48px -16px rgba(0, 0, 0, 0.6);
+}
+
+.swap-cta {
+  background: linear-gradient(180deg, #2a3548 0%, #1e2836 100%);
+  border: 1px solid #3d4d66;
+  color: #f0f2f5;
+}
+
+.swap-cta:hover:not(:disabled) {
+  background: linear-gradient(180deg, #354358 0%, #2a3548 100%);
+  border-color: #4d5f7a;
+}
+
+.swap-cta-primary {
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 20px -4px rgba(249, 115, 22, 0.45);
+}
+
+.swap-cta-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 28px -4px rgba(249, 115, 22, 0.55);
+}
+
+.swap-cta:disabled,
+.swap-cta-primary:disabled {
+  background: #1a222e;
+  border-color: #2a3548;
+  color: #5c6478;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@keyframes arcane-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes arcane-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.arcane-spinner {
+  animation: arcane-spin 0.7s linear infinite;
+}
+
+.arcane-shimmer {
+  background: linear-gradient(
+    90deg,
+    #1a222e 0%,
+    #2a3548 50%,
+    #1a222e 100%
+  );
+  background-size: 200% 100%;
+  animation: arcane-shimmer 1.4s ease-in-out infinite;
+}
+
+.arcane-pulse-ring {
+  animation: arcane-pulse-ring 1.5s ease-in-out infinite;
+}
+
+@keyframes arcane-pulse-ring {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+[data-rk] {
+  --rk-colors-accentColor: #f97316;
+  --rk-colors-accentColorForeground: #ffffff;
+  --rk-colors-connectButtonBackground: #141c28;
+  --rk-colors-connectButtonText: #f0f2f5;
+  --rk-colors-modalBackground: #121b24;
+  --rk-colors-modalText: #f0f2f5;
+  --rk-colors-modalTextSecondary: #8b95a8;
+  --rk-colors-modalBorder: #2a3548;
+  --rk-colors-profileForeground: #141c28;
+  --rk-colors-closeButtonBackground: #1e2836;
+  --rk-colors-menuItemBackground: #1a222e;
 }
