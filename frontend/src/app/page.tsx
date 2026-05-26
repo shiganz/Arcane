@@ -3,7 +3,7 @@ import { SwapCard } from "@/components/swap/SwapCard";
 export default function Home() {
   return (
     <div className="arcane-bg relative flex min-h-full flex-1 flex-col">
-      <main className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-8 sm:py-12">
+      <main className="relative mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-8 sm:py-12 justify-center items-center">
         <SwapCard />
       </main>
 
